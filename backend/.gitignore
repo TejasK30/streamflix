@@ -1,0 +1,28 @@
+# Node modules
+node_modules/
+
+# TypeScript build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Local environment variables
+.env
+
+# Uploaded files (temp or raw)
+uploads/
+videos/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Docker-related (optional)
+.pnpm-store/
+docker-compose.override.yml
+
+# VSCode settings (optional)
+.vscode/
