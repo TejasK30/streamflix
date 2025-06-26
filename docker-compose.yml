@@ -1,29 +1,43 @@
 services:
+
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: streamflix
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
   redis:
     image: redis:7-alpine
-    restart: unless-stopped    
+    restart: unless-stopped
     ports:
       - "6379:6379"
-
     volumes:
-      - redis-data:/data
+      - redis_data:/data
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      restart: unless-stopped    
+    restart: always
     ports:
       - "5000:5000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - REDIS_URL=redis://redis:6379
       - PORT=5000
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/streamflix
     volumes:
       - video_storage:/app/videos
       - upload_temp:/app/uploads
     depends_on:
       - redis
+      - postgres
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -34,7 +48,6 @@ services:
     build:
       context: ./backend
       dockerfile: worker.Dockerfile
-    restart: unless-stopped
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://redis:6379
@@ -46,36 +59,10 @@ services:
       - redis
       - backend
     deploy:
-      replicas: 2  
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3000
-    depends_on:
-      - backend
-
-
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - video_storage:/var/www/videos:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - frontend
-      - backend
+      replicas: 2
 
 volumes:
+  pg_data:
   redis_data:
   video_storage:
   upload_temp:

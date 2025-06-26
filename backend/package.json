@@ -4,7 +4,17 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "dev": "nodemon"
+    "dev": "nodemon",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "generate": "pnpm drizzle-kit generate",
+    "migrate": "pnpm drizzle-kit migrate",
+    "push": "pnpm drizzle-kit push",
+    "pull": "pnpm drizzle-kit pull",
+    "check": "pnpm drizzle-kit check",
+    "up": "pnpm drizzle-kit up",
+    "studio": "pnpm drizzle-kit studio",
+    "worker": "ts-node src/RunWorker.ts"
   },
   "keywords": [],
   "author": "",
@@ -14,14 +24,24 @@
     "bullmq": "^5.56.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
+    "drizzle-orm": "^0.44.2",
     "express": "^5.1.0",
     "fluent-ffmpeg": "^2.1.3",
     "ioredis": "^5.6.1",
-    "multer": "^2.0.1"
+    "multer": "^2.0.1",
+    "pg": "^8.16.2",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^24.0.4",
+    "@types/pg": "^8.15.4",
+    "drizzle-kit": "^0.31.2",
     "nodemon": "^3.1.10",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }

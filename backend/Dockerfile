@@ -1,26 +1,39 @@
-FROM node:20-alpine
+FROM node:20-alpine AS builder
 
-# install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# install ffmpeg and curl 
-RUN apk add --no-cache ffmpeg curl
-
+RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
-COPY pnpm-lock.yaml package.json ./
+COPY package.json pnpm-lock.yaml ./
 
-# Install only production dependencies
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
 RUN pnpm run build
 
-# Create directories
+FROM node:20-alpine
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+RUN apk add --no-cache ffmpeg 
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml ./
+
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=builder /app/dist ./dist
+# Copy the Drizzle configuration file needed for migrations or introspection
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/drizzle ./drizzle
+
+#folders needed for uploaded and transcoded video files
 RUN mkdir -p uploads videos
 
 EXPOSE 5000
 
-CMD [ "node", "dist/app.js" ]
+CMD ["node", "dist/app.js"]
