@@ -1,8 +1,8 @@
 import { Request, Response } from "express"
 import { v4 as uuidV4 } from "uuid"
+import { transcodingQueue } from "../config/queue"
 import { db } from "../drizzle"
 import { videos } from "../schema"
-import { transcodingQueue } from "../config/queue"
 
 export const upLoadController = async (
   req: Request,

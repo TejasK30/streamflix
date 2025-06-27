@@ -1,9 +1,9 @@
-import fs from "fs"
+import { eq } from "drizzle-orm"
 import ffmpeg from "fluent-ffmpeg"
+import fs from "fs"
 import path from "path"
 import { db } from "./drizzle"
 import { videos } from "./schema"
-import { eq } from "drizzle-orm"
 
 interface resolutionTypes {
   resolutions: Record<string, string>
@@ -21,30 +21,34 @@ const QUALITY_PRESETS = {
     videoBitrate: "800k",
     audioBitrate: "96k",
     scale: "scale=640:360",
+    height: 360,
   },
   "480p": {
     resolution: "854x480",
     videoBitrate: "1400k",
     audioBitrate: "128k",
     scale: "scale=854:480",
+    height: 480,
   },
   "720p": {
     resolution: "1280x720",
     videoBitrate: "2800k",
     audioBitrate: "128k",
     scale: "scale=1280:720",
+    height: 720,
   },
   "1080p": {
     resolution: "1920x1080",
     videoBitrate: "5000k",
     audioBitrate: "192k",
     scale: "scale=1920:1080",
+    height: 1080,
   },
 }
 
 export class TranscodeWorker {
+  // get metadata for uploaded video
   private async getVideoMetadata(inputPath: string): Promise<any> {
-    // get metadata for uploaded video
     return new Promise((resolve, reject) => {
       console.log(`Getting metadata for: ${inputPath}`)
       ffmpeg.ffprobe(inputPath, (err, metadata) => {
@@ -59,23 +63,45 @@ export class TranscodeWorker {
     })
   }
 
-  // get video resolutions to transcode based on original height of uploaded video
+  // get video resolutions to transcode based on uploaded video height
   private getResolutionsToGenerate(originalHeight: number): string[] {
-    const resolutions = []
+    const resolutions = Object.keys(QUALITY_PRESETS)
 
-    if (originalHeight >= 360) resolutions.push("360p")
-    if (originalHeight >= 480) resolutions.push("480p")
-    if (originalHeight >= 720) resolutions.push("720p")
-    if (originalHeight >= 1080) resolutions.push("1080p")
+    const originalResolutionKey = `${originalHeight}p`
+    const presetHeights = Object.values(QUALITY_PRESETS).map((p) => p.height)
 
-    console.log(
-      `Original height: ${originalHeight}px, generating resolutions: ${resolutions.join(
-        ", "
-      )}`
-    )
-    return resolutions
+    if (!presetHeights.includes(originalHeight)) {
+      // Add custom resolution + preset if not already defined
+      resolutions.push(originalResolutionKey)
+      QUALITY_PRESETS[originalResolutionKey as keyof typeof QUALITY_PRESETS] = {
+        resolution: `${Math.round(
+          (originalHeight * 16) / 9
+        )}x${originalHeight}`,
+        videoBitrate: this.calculateBitrate(originalHeight),
+        audioBitrate: originalHeight >= 720 ? "192k" : "128k",
+        scale: `scale=${Math.round(
+          (originalHeight * 16) / 9
+        )}:${originalHeight}`,
+        height: originalHeight,
+      } as any
+    }
+
+    const uniqueResolutions = [...new Set(resolutions)]
+
+    return uniqueResolutions
   }
 
+  private calculateBitrate(height: number): string {
+    // Calculate appropriate bitrate based on height
+    if (height <= 360) return "800k"
+    if (height <= 480) return "1400k"
+    if (height <= 720) return "2800k"
+    if (height <= 1080) return "5000k"
+    // For higher resolutions, scale accordingly
+    return `${Math.round((height / 1080) * 5000)}k`
+  }
+
+  // transcode video to provided resolution
   private async transcodeVideoToResolution(
     inputPath: string,
     outputPath: string,
@@ -101,35 +127,45 @@ export class TranscodeWorker {
         ])
         .output(outputPath)
         .on("start", (commandLine) => {
-          console.log(`FFmpeg command: ${commandLine}`)
+          console.log(`Starting transcoding for resolution: ${resolution}`)
         })
         .on("end", () => {
-          // actively track remaining time to transcode
-          const duration = ((Date.now() - startTime) / 1000).toFixed(2)
-          console.log(
-            `✅ Transcoded to ${resolution} in ${duration}s: ${outputPath}`
-          )
+          console.log(`Transcoded to ${resolution} in: ${outputPath}`)
           resolve()
         })
         .on("error", (err) => {
-          console.error(`❌ Error transcoding to ${resolution}:`, err.message)
+          console.error(`Error transcoding to ${resolution}:`, err.message)
           reject(err)
-        })
-        .on("progress", (progress) => {
-          const percent = Math.round(progress.percent || 0)
-          console.log(`${resolution}: ${percent}% complete`)
         })
         .run()
     })
   }
 
+  // transcode video to each resolution and generate HLS playlist
   async transcodeVideo(job: transcodingJob) {
     const { videoId, inputPath, outputDir } = job
-    console.log(`🎬 Starting transcoding for video ${videoId}`)
+    console.log(`Starting transcoding for video ${videoId}`)
     console.log(`Input: ${inputPath}`)
     console.log(`Output directory: ${outputDir}`)
 
     try {
+      const existingVideo = await db
+        .select()
+        .from(videos)
+        .where(eq(videos.id, videoId))
+        .limit(1)
+
+      if (existingVideo.length === 0) {
+        throw new Error(`Video with ID ${videoId} not found in database`)
+      }
+
+      const video = existingVideo[0]
+
+      if (video.status === "completed") {
+        console.log(`Video ${videoId} is already transcoded. Skipping.`)
+        return
+      }
+
       // Create output directory if doesn't exists
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true })
@@ -153,10 +189,22 @@ export class TranscodeWorker {
         resolutionPaths[resolution] = `videos/${videoId}/${resolution}.mp4`
       }
 
-      // Update video status
-      await this.updateVideoStatus(videoId, "completed", {
-        resolutions: resolutionPaths,
-      })
+      // Generate HLS playlists
+      const hlsPath = await this.generateHLSPlaylist(
+        inputPath,
+        outputDir,
+        resolutionsToGenerate
+      )
+
+      // update the video status and add generated paths in DB
+      await this.updateVideoStatus(
+        videoId,
+        "completed",
+        {
+          resolutions: resolutionPaths,
+        },
+        hlsPath
+      )
 
       // Clean up original file
       fs.unlinkSync(inputPath)
@@ -173,14 +221,123 @@ export class TranscodeWorker {
   async updateVideoStatus(
     videoId: string,
     status: string,
-    data?: resolutionTypes
+    data?: resolutionTypes,
+    hlsPlaylist?: string
   ) {
-    await db
+    const result = await db
       .update(videos)
       .set({
-        status: status,
-        resolutions: data,
+        status,
+        resolutions: data?.resolutions ?? {},
+        hlsPlaylist: hlsPlaylist,
       })
       .where(eq(videos.id, videoId))
+      .returning()
+  }
+
+  // generate hls playlist for video
+  private async generateHLSPlaylist(
+    inputPath: string,
+    outputDir: string,
+    resolutions: string[]
+  ) {
+    try {
+      console.log("Starting HLS playlist generation...")
+
+      // Create HLS output directory if it doesn't exist
+      const hlsDir = path.join(outputDir, "hls")
+      if (!fs.existsSync(hlsDir)) {
+        console.log(`Creating HLS directory at: ${hlsDir}`)
+        fs.mkdirSync(hlsDir, { recursive: true })
+      }
+
+      // Generate HLS .m3u8 playlist for each resolution
+      const hlsPromises = resolutions.map((resolution) => {
+        const preset =
+          QUALITY_PRESETS[resolution as keyof typeof QUALITY_PRESETS]
+
+        const outputPath = path.join(hlsDir, `${resolution}.m3u8`)
+
+        console.time(`HLS generation for ${resolution}`)
+
+        return new Promise((resolve, reject) => {
+          ffmpeg(inputPath)
+            .outputOptions([
+              "-c:v libx264",
+              "-c:a aac",
+              `-b:v ${preset.videoBitrate}`,
+              `-b:a ${preset.audioBitrate}`,
+              `-vf ${preset.scale}`,
+              "-preset fast",
+              "-crf 23",
+              "-f hls",
+              "-hls_time 10",
+              "-hls_list_size 0",
+              "-hls_segment_filename",
+              path.join(hlsDir, `${resolution}_%03d.ts`),
+            ])
+            .output(outputPath)
+            .on("start", () => {
+              console.log(
+                `Starting HLS Playlist generation for: [${resolution}] `
+              )
+            })
+            .on("end", () => {
+              console.timeEnd(`HLS generation for ${resolution}`)
+              console.log(
+                `[${resolution}] HLS stream generated at ${outputPath}`
+              )
+              resolve(null)
+            })
+            .on("error", (err) => {
+              console.error(
+                `[${resolution}] HLS generation failed:`,
+                err.message
+              )
+              console.timeEnd(`HLS generation for ${resolution}`)
+              reject(err)
+            })
+            .run()
+        })
+      })
+
+      await Promise.all(hlsPromises)
+
+      console.log("All HLS variant playlists generated successfully")
+
+      // Generate master.m3u8 playlist for all resolutions
+      console.log("Generating master HLS playlist...")
+
+      const masterPlaylistPath = path.join(hlsDir, "master.m3u8")
+      const masterPlaylistContent = this.generateMasterPlaylist(resolutions)
+
+      fs.writeFileSync(masterPlaylistPath, masterPlaylistContent)
+
+      console.log(`Master playlist written to: ${masterPlaylistPath}`)
+
+      return `videos/${path.basename(outputDir)}/hls/master.m3u8`
+    } catch (error) {
+      console.error("HLS playlist generation failed:", error)
+    }
+  }
+
+  private generateMasterPlaylist(resolutions: string[]): string {
+    // Master HLS playlist format
+    let content = "#EXTM3U\n#EXT-X-VERSION:3\n\n"
+
+    for (const resolution of resolutions) {
+      const preset = QUALITY_PRESETS[resolution as keyof typeof QUALITY_PRESETS]
+
+      // Calculate bandwidth in bits per second
+      const bandwidth = parseInt(preset.videoBitrate.replace("k", "")) * 1000
+      const [width, height] = preset.resolution.split("x")
+
+      // Add stream information and reference to variant playlist
+      content += `#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth},RESOLUTION=${width}x${height}\n`
+      content += `${resolution}.m3u8\n\n`
+    }
+
+    console.log("Master playlist content generated successfully")
+    return content
   }
 }
