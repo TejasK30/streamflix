@@ -1,4 +1,4 @@
-import fs from "fs"
+import fs from "fs/promises"
 import multer from "multer"
 import { v4 as uuidv4 } from "uuid"
 import { existsSync } from "fs"
@@ -7,7 +7,7 @@ import path from "path"
 const UPLOAD_DIR = path.resolve(process.cwd(), "uploads")
 
 if (!existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true })
+  fs.mkdir(UPLOAD_DIR, { recursive: true })
 }
 
 // initialize storage for video uploads
