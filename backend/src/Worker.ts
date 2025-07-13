@@ -8,6 +8,9 @@ import { videos } from "./schema"
 interface resolutionTypes {
   resolutions: Record<string, string>
 }
+interface hlsPlaylistsTypes {
+  hlsPlaylists: Record<string, string>
+}
 
 interface transcodingJob {
   videoId: string
@@ -101,46 +104,6 @@ export class TranscodeWorker {
     return `${Math.round((height / 1080) * 5000)}k`
   }
 
-  // transcode video to provided resolution
-  private async transcodeVideoToResolution(
-    inputPath: string,
-    outputPath: string,
-    resolution: string
-  ): Promise<void> {
-    const preset = QUALITY_PRESETS[resolution as keyof typeof QUALITY_PRESETS]
-
-    console.log(`Starting transcoding to ${resolution}: ${outputPath}`)
-
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now()
-
-      ffmpeg(inputPath)
-        .outputOptions([
-          "-c:v libx264",
-          "-c:a aac",
-          `-b:v ${preset.videoBitrate}`,
-          `-b:a ${preset.audioBitrate}`,
-          `-vf ${preset.scale}`,
-          "-preset fast",
-          "-crf 23",
-          "-movflags +faststart",
-        ])
-        .output(outputPath)
-        .on("start", (commandLine) => {
-          console.log(`Starting transcoding for resolution: ${resolution}`)
-        })
-        .on("end", () => {
-          console.log(`Transcoded to ${resolution} in: ${outputPath}`)
-          resolve()
-        })
-        .on("error", (err) => {
-          console.error(`Error transcoding to ${resolution}:`, err.message)
-          reject(err)
-        })
-        .run()
-    })
-  }
-
   // transcode video to each resolution and generate HLS playlist
   async transcodeVideo(job: transcodingJob) {
     const { videoId, inputPath, outputDir } = job
@@ -182,13 +145,6 @@ export class TranscodeWorker {
       // Transcode to different resolutions
       const resolutionPaths: Record<string, string> = {}
 
-      // transcode given video to each resolution
-      for (const resolution of resolutionsToGenerate) {
-        const outputPath = path.join(outputDir, `${resolution}.mp4`)
-        await this.transcodeVideoToResolution(inputPath, outputPath, resolution)
-        resolutionPaths[resolution] = `videos/${videoId}/${resolution}.mp4`
-      }
-
       // Generate HLS playlists
       const hlsPath = await this.generateHLSPlaylist(
         inputPath,
@@ -197,14 +153,7 @@ export class TranscodeWorker {
       )
 
       // update the video status and add generated paths in DB
-      await this.updateVideoStatus(
-        videoId,
-        "completed",
-        {
-          resolutions: resolutionPaths,
-        },
-        hlsPath
-      )
+      await this.updateVideoStatus(videoId, "completed", hlsPath)
 
       // Clean up original file
       fs.unlinkSync(inputPath)
@@ -221,14 +170,12 @@ export class TranscodeWorker {
   async updateVideoStatus(
     videoId: string,
     status: string,
-    data?: resolutionTypes,
-    hlsPlaylist?: string
+    hlsPlaylist?: hlsPlaylistsTypes
   ) {
     const result = await db
       .update(videos)
       .set({
         status,
-        resolutions: data?.resolutions ?? {},
         hlsPlaylist: hlsPlaylist,
       })
       .where(eq(videos.id, videoId))
@@ -250,6 +197,8 @@ export class TranscodeWorker {
         console.log(`Creating HLS directory at: ${hlsDir}`)
         fs.mkdirSync(hlsDir, { recursive: true })
       }
+
+      const hlsPlaylists: Record<string, string> = {}
 
       // Generate HLS .m3u8 playlist for each resolution
       const hlsPromises = resolutions.map((resolution) => {
@@ -284,9 +233,13 @@ export class TranscodeWorker {
             })
             .on("end", () => {
               console.timeEnd(`HLS generation for ${resolution}`)
+
               console.log(
                 `[${resolution}] HLS stream generated at ${outputPath}`
               )
+              hlsPlaylists[resolution] = `videos/${path.basename(
+                outputDir
+              )}/hls/${resolution}.m3u8`
               resolve(null)
             })
             .on("error", (err) => {
@@ -315,7 +268,11 @@ export class TranscodeWorker {
 
       console.log(`Master playlist written to: ${masterPlaylistPath}`)
 
-      return `videos/${path.basename(outputDir)}/hls/master.m3u8`
+      hlsPlaylists["master"] = `videos/${path.basename(
+        outputDir
+      )}/hls/master.m3u8`
+
+      return { hlsPlaylists }
     } catch (error) {
       console.error("HLS playlist generation failed:", error)
     }

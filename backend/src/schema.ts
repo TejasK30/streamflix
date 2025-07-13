@@ -5,7 +5,6 @@ export const videos = pgTable("videos", {
   originalName: text("originalName").notNull(),
   filename: text("filename").notNull(),
   status: text("status"),
-  resolutions: jsonb("resolutions").default({}),
-  hlsPlaylist: text("hls_playlist"),
+  hlsPlaylist: jsonb("hls_playlist").default({}),
   createdAt: timestamp("created_at").defaultNow(),
 })

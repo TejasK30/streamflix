@@ -2,10 +2,9 @@
 
 import React, { useEffect, useRef } from "react"
 import videojs from "video.js"
+import "video.js/dist/video-js.css"
 
 type options = typeof videojs.options
-
-import "video.js/dist/video-js.css"
 
 interface VideoPlayerProps {
   options: options
@@ -27,6 +26,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ options, onReady }) => {
         videoElement as unknown as HTMLVideoElement,
         options,
         () => {
+          // Initialize the HLS quality selector plugin
+          // @ts-ignore
+          player.hlsQualitySelector?.({
+            displayCurrentQuality: true,
+          })
           videojs.log("player is ready")
           onReady?.(player)
         }
