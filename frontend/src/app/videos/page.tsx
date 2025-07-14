@@ -35,16 +35,18 @@ const VideoPage = () => {
   return (
     <>
       <main className="p-6">
-        <h1 className="text-3xl font-bold mb-6">HLS Video Grid</h1>
+        <h1 className="text-3xl font-bold mb-6">Videos</h1>
 
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {videos.map((video, index) => (
             <>
               <div
                 key={index}
-                className="w-full rounded-2xl shadow-lg overflow-hidden"
+                className="w-full rounded-2xl shadow-lg overflow-hidden border-2 border-red-600"
               >
-                <h2 className="text-xl font-semibold p-4">{video.name}</h2>
+                <h2 className="text-lg w-full font-semibold p-2">
+                  {video.name}
+                </h2>
                 <VideoPlayer
                   options={{
                     autoplay: false,

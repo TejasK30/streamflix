@@ -26,7 +26,7 @@ export const upLoadController = async (
       originalName: file.originalname,
       filename: file.filename,
       status: "processing",
-      resolutions: {},
+      hlsPlaylist: {},
     })
 
     console.log(`Video metadata saved to database`)
