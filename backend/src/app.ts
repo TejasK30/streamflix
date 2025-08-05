@@ -1,21 +1,14 @@
-import "dotenv/config"
-import express, { Request, Response } from "express"
 import cors from "cors"
-import { upload } from "./config/fileUpload"
-import { upLoadController } from "./controllers/upload.controller"
-import redis from "./config/redis"
-import { db, runMigrations } from "./drizzle"
-import { videos } from "./schema"
+import "dotenv/config"
 import { eq } from "drizzle-orm"
+import express, { Request, Response } from "express"
+import { upload } from "./config/fileUpload"
+import redis from "./config/redis"
+import { upLoadController } from "./controllers/upload.controller"
+import { db } from "./drizzle"
+import { videos } from "./schema"
 
 const app = express()
-
-// apply migrations to the db
-async function startServer() {
-  await runMigrations()
-}
-
-startServer()
 
 app.use(
   cors({

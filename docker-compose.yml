@@ -2,7 +2,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: streamflix
       POSTGRES_USER: postgres
@@ -24,7 +24,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    restart: always
+    restart: unless-stopped
     ports:
       - "5000:5000"
     environment:

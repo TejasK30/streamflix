@@ -27,12 +27,6 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/dist ./dist
-# Copy the Drizzle configuration file needed for migrations or introspection
-COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder /app/drizzle ./drizzle
-
-#folders needed for uploaded and transcoded video files
-RUN mkdir -p uploads videos
 
 EXPOSE 5000
 

@@ -14,7 +14,7 @@
     "check": "pnpm drizzle-kit check",
     "up": "pnpm drizzle-kit up",
     "studio": "pnpm drizzle-kit studio",
-    "worker": "ts-node src/RunWorker.ts"
+    "worker": "ts-node src/worker.ts"
   },
   "keywords": [],
   "author": "",

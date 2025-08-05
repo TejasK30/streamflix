@@ -13,33 +13,32 @@ interface TranscodingJobData {
 const transcoder = new TranscodeWorker()
 type TranscodingJob = Job<TranscodingJobData>
 
-export const worker: Worker<TranscodingJobData> =
-  new Worker<TranscodingJobData>(
-    "transcoding-queue",
-    async (job: TranscodingJob): Promise<void> => {
-      console.log(`🎬 Processing job ${job.id}: ${job.data.videoId}`)
-      console.log(`📁 Input: ${job.data.inputPath}`)
-      console.log(`📂 Output: ${job.data.outputDir}`)
+const worker: Worker<TranscodingJobData> = new Worker<TranscodingJobData>(
+  "transcoding-queue",
+  async (job: TranscodingJob): Promise<void> => {
+    console.log(`🎬 Processing job ${job.id}: ${job.data.videoId}`)
+    console.log(`📁 Input: ${job.data.inputPath}`)
+    console.log(`📂 Output: ${job.data.outputDir}`)
 
-      try {
-        // add the video to worker
-        await transcoder.transcodeVideo({
-          videoId: job.data.videoId,
-          inputPath: job.data.inputPath,
-          outputDir: job.data.outputDir,
-        })
+    try {
+      // add the video to worker
+      await transcoder.transcodeVideo({
+        videoId: job.data.videoId,
+        inputPath: job.data.inputPath,
+        outputDir: job.data.outputDir,
+      })
 
-        console.log(`✅ Transcoding completed for ${job.data.videoId}`)
-      } catch (error) {
-        console.error(`❌ Transcoding failed for ${job.data.videoId}:`, error)
-        throw error
-      }
-    },
-    {
-      connection: redis,
-      concurrency: 2,
+      console.log(`✅ Transcoding completed for ${job.data.videoId}`)
+    } catch (error) {
+      console.error(`❌ Transcoding failed for ${job.data.videoId}:`, error)
+      throw error
     }
-  )
+  },
+  {
+    connection: redis,
+    concurrency: 2,
+  }
+)
 
 worker.on("completed", (job: TranscodingJob): void => {
   console.log(`Job ${job.id} completed successfully`)

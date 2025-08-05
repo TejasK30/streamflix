@@ -3,7 +3,7 @@ FROM node:20-alpine
 #install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# install ffmpeg and curl 
+# install ffmpeg 
 RUN apk add --no-cache ffmpeg 
 
 WORKDIR /app
@@ -21,4 +21,4 @@ RUN pnpm run build
 RUN mkdir -p uploads videos
 
 
-CMD [ "node", "dist/RunWorker.js" ]
+CMD [ "node", "dist/Worker.js" ]
