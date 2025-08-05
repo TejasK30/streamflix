@@ -1,7 +1,6 @@
 "use client"
 
 import UploadModal from "@/components/UploadModal"
-import React, { useState } from "react"
 
 const UploadPage = () => {
   return (

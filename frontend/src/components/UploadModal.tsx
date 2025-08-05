@@ -96,7 +96,7 @@ const UploadModal = () => {
       <div className="flex flex-col items-center justify-center w-full px-4 max-h-[calc(100vh-100px)] overflow-hidden">
         <button
           onClick={openModal}
-          className="p-2 bg-blue-600 hover:bg-blue-700 rounded fond-semibold"
+          className="p-2 bg-blue-600 text-white hover:bg-blue-700 rounded fond-semibold"
         >
           Upload video
         </button>
@@ -116,7 +116,7 @@ const UploadModal = () => {
             >
               <div
                 onClick={closeModal}
-                className="bg-red-600 p-2 rounded top-3 right-3 absolute cursor-pointer"
+                className="bg-red-600 text-white p-2 rounded top-3 right-3 absolute cursor-pointer"
               >
                 close
               </div>
@@ -124,7 +124,7 @@ const UploadModal = () => {
                 Drag and drop a video here or click below
               </p>
 
-              <label className="cursor-pointer bg-blue-500 px-4 py-2 rounded hover:bg-blue-600 transition-colors">
+              <label className="cursor-pointer bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors">
                 Choose File
                 <input
                   type="file"
