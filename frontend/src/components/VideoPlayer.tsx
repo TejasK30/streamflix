@@ -22,18 +22,32 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ options, onReady }) => {
 
       videoRef.current.appendChild(videoElement)
 
+      const mergedOptions = {
+        ...options,
+        responsive: true,
+        fluid: true,
+        html5: {
+          ...((options as any).html5 ?? {}),
+          vhs: {
+            limitRenditionByPlayerDimensions: false,
+            useDevicePixelRatio: true,
+            bandwidth: 5_000_000,
+            ...((options as any).html5?.vhs ?? {}),
+          },
+        },
+      }
+
       const player = (playerRef.current = videojs(
         videoElement as unknown as HTMLVideoElement,
-        options,
+        mergedOptions,
         () => {
-          // Initialize the HLS quality selector plugin
           // @ts-ignore
           player.hlsQualitySelector?.({
             displayCurrentQuality: true,
           })
           videojs.log("player is ready")
           onReady?.(player)
-        }
+        },
       ))
     } else if (playerRef.current) {
       playerRef.current.autoplay(options.autoplay ?? false)
@@ -50,8 +64,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ options, onReady }) => {
     }
   }, [])
 
+  // ✅ Give the container explicit dimensions so VHS doesn't measure 0×0
   return (
-    <div data-vjs-player>
+    <div data-vjs-player style={{ width: "100%", aspectRatio: "16/9" }}>
       <div ref={videoRef} />
     </div>
   )
