@@ -21,8 +21,6 @@ const VideoPage = () => {
         const res = await fetch("http://localhost:5000/videos")
         const data = await res.json()
 
-        console.log(data)
-
         setVideos(data)
       } catch (error) {
         console.error("Failed to fetch videos:", error)
@@ -37,7 +35,8 @@ const VideoPage = () => {
       <main className="p-6">
         <h1 className="text-3xl font-bold mb-6">Videos</h1>
 
-        <div className="grid gap-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {" "}
           {videos.map((video, index) => (
             <>
               <div
